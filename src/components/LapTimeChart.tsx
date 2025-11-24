@@ -43,12 +43,21 @@ export const LapTimeChart: React.FC<LapTimeChartProps> = ({ laps, currentLap }) 
   };
 
   const chartData = laps
-    .filter((lap: CleanedLap) => !lap.isPitLap && lap.lapTime > 0 && lap.lapTime < 200)
+    .filter((lap: CleanedLap) => !lap.isPitLap && lap.lapTime > 0 && lap.lapTime < 300)
     .map((lap: CleanedLap) => ({
       lap: lap.lapNumber,
       lapTime: parseFloat(lap.lapTime.toFixed(2)),
       avgSpeed: parseFloat(lap.avgSpeed.toFixed(1)),
     }));
+
+  // Debug: log if no data
+  if (chartData.length === 0 && laps.length > 0) {
+    console.warn(`⚠️ LapTimeChart: ${laps.length} laps provided but 0 passed filter. First lap:`, {
+      isPitLap: laps[0]?.isPitLap,
+      lapTime: laps[0]?.lapTime,
+      avgSpeed: laps[0]?.avgSpeed
+    });
+  }
 
   const bestLapTime: number = chartData.length > 0 
     ? Math.min(...chartData.map((d: { lap: number; lapTime: number; avgSpeed: number }) => d.lapTime))
