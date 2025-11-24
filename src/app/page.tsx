@@ -1,6 +1,5 @@
 'use client'
-import type React, { useEffect } from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -41,14 +40,10 @@ export default function RaceSenseDashboard(): React.JSX.Element {
         } catch (error) {
           console.error('Failed to add mini app:', error)
         }
-
       }
-
-    
-
       tryAddMiniApp()
-    }, [addMiniApp])
-    useQuickAuth(isInFarcaster)
+    }, [])
+    useQuickAuth()
     useEffect(() => {
       const initializeFarcaster = async () => {
         try {
@@ -188,9 +183,9 @@ export default function RaceSenseDashboard(): React.JSX.Element {
       const tireDeg: TireDegradation[] = TelemetryProcessor.calculateTireDegradation(cleanedLaps);
       setHealthReport(health);
       
-      // Calculate initial strategy
+      // Calculate initial strategy (relaxed filter to include more valid laps)
       const racingLaps: CleanedLap[] = cleanedLaps.filter((lap: CleanedLap) => 
-        !lap.isPitLap && lap.lapTime > 0 && lap.lapTime < 200
+        !lap.isPitLap && lap.lapTime > 0 && lap.lapTime < 400
       );
       
       const avgLapTime: number = racingLaps.length > 0
@@ -222,32 +217,31 @@ export default function RaceSenseDashboard(): React.JSX.Element {
     }
   }, []);
 
-  // Update strategy as race progresses
-  useEffect(() => {
-    if (!raceStrategy) return;
+  // Calculate pit recommendation based on current lap (memoized to avoid recalculation)
+  const currentPitRecommendation: PitRecommendation | null = useMemo(() => {
+    if (!raceStrategy) return null;
 
     const visibleLaps: CleanedLap[] = raceStrategy.laps.filter((lap: CleanedLap) => lap.lapNumber <= currentLap);
     const visibleTireDeg: TireDegradation[] = raceStrategy.tireDegradation.filter(
       (deg: TireDegradation) => deg.lapNumber <= currentLap
     );
 
-    const recommendation: PitRecommendation = PitStrategyCalculator.calculatePitRecommendation(
+    return PitStrategyCalculator.calculatePitRecommendation(
       currentLap,
       visibleLaps,
       visibleTireDeg,
       totalLaps
     );
+  }, [currentLap, raceStrategy, totalLaps]);
 
-    // Show dramatic alert for high urgency
-    if (recommendation.urgency === 'high') {
+  // Show dramatic alert for high urgency
+  useEffect(() => {
+    if (currentPitRecommendation?.urgency === 'high') {
       setShowAlert(true);
-      setTimeout(() => setShowAlert(false), 5000); // Hide after 5 seconds
+      const timer = setTimeout(() => setShowAlert(false), 5000);
+      return () => clearTimeout(timer);
     }
-
-    setRaceStrategy((prev: RaceStrategy | null) => 
-      prev ? { ...prev, currentLap, pitRecommendations: [recommendation] } : null
-    );
-  }, [currentLap, raceStrategy?.laps, raceStrategy?.tireDegradation, totalLaps]);
+  }, [currentPitRecommendation]);
 
   // Auto-play functionality
   useEffect(() => {
@@ -589,14 +583,15 @@ export default function RaceSenseDashboard(): React.JSX.Element {
         backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 100px, #EB0A1E 100px, #EB0A1E 105px)`,
       }} />
       {/* Dramatic Alert Overlay */}
-      {raceStrategy?.pitRecommendations[0] && (
+      {currentPitRecommendation && (
         <DramaticAlert
           show={showAlert}
-          urgency={raceStrategy.pitRecommendations[0].urgency}
+          urgency={currentPitRecommendation.urgency}
           message={`🏁 PIT STOP RECOMMENDED!`}
-          details={`Lap ${raceStrategy.pitRecommendations[0].recommendedPitLap} • Tire degradation: ${(raceStrategy.pitRecommendations[0].timeSaving || 0).toFixed(1)}s`}
+          details={`Lap ${currentPitRecommendation.recommendedPitLap} • Tire degradation: ${(currentPitRecommendation.timeSaving || 0).toFixed(1)}s`}
         />
       )}
+
 
       <div className="max-w-7xl mx-auto space-y-6 relative z-10">
         {/* Header */}
@@ -623,11 +618,11 @@ export default function RaceSenseDashboard(): React.JSX.Element {
             <Badge variant="outline" className="text-lg px-4 py-2 bg-black border-[#EB0A1E] text-white font-mono font-bold">
               LAP {currentLap} / {totalLaps}
             </Badge>
-            {raceStrategy.pitRecommendations[0] && (
+            {currentPitRecommendation && (
               <Badge 
-                className={`font-black tracking-wider ${raceStrategy.pitRecommendations[0].urgency === 'high' ? 'bg-[#EB0A1E] text-white animate-pulse' : 'bg-yellow-600 text-black'}`}
+                className={`font-black tracking-wider ${currentPitRecommendation.urgency === 'high' ? 'bg-[#EB0A1E] text-white animate-pulse' : 'bg-yellow-600 text-black'}`}
               >
-                {raceStrategy.pitRecommendations[0].urgency.toUpperCase()}
+                {currentPitRecommendation.urgency.toUpperCase()}
               </Badge>
             )}
           </div>
@@ -765,7 +760,7 @@ export default function RaceSenseDashboard(): React.JSX.Element {
 
           <TabsContent value="analytics" className="space-y-6 mt-6">
             {/* Pit Strategy */}
-            <PitStrategyPanel recommendation={raceStrategy.pitRecommendations[0] || null} />
+            <PitStrategyPanel recommendation={currentPitRecommendation} />
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -794,7 +789,7 @@ export default function RaceSenseDashboard(): React.JSX.Element {
               <RaceSummary
                 laps={raceStrategy.laps}
                 tireDegradation={raceStrategy.tireDegradation}
-                pitRecommendations={raceStrategy.pitRecommendations}
+                pitRecommendations={currentPitRecommendation ? [currentPitRecommendation] : []}
                 totalLaps={totalLaps}
                 carNumber={raceStrategy.carNumber}
                 onExportJSON={exportJSON}
