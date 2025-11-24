@@ -27,14 +27,13 @@ import { generateSampleCOTAData, sampleDataInfo } from '@/lib/sampleData';
 import type { RawTelemetryPoint, CleanedLap, TireDegradation, PitRecommendation, RaceStrategy } from '@/types/telemetry';
 import type { TelemetryHealthReport } from '@/lib/dataQuality';
 import { sdk } from "@farcaster/miniapp-sdk";
-import { useAddMiniApp } from "@/hooks/useAddMiniApp";
 import { useQuickAuth } from "@/hooks/useQuickAuth";
 import { useIsInFarcaster } from "@/hooks/useIsInFarcaster";
+import { useAddMiniApp } from "@/hooks/useAddMiniApp";
 
 export default function RaceSenseDashboard(): React.JSX.Element {
-    const { addMiniApp } = useAddMiniApp();
     const isInFarcaster = useIsInFarcaster()
-    useQuickAuth(isInFarcaster)
+    const { addMiniApp } = useAddMiniApp();
     useEffect(() => {
       const tryAddMiniApp = async () => {
         try {
@@ -49,6 +48,7 @@ export default function RaceSenseDashboard(): React.JSX.Element {
 
       tryAddMiniApp()
     }, [addMiniApp])
+    useQuickAuth(isInFarcaster)
     useEffect(() => {
       const initializeFarcaster = async () => {
         try {
@@ -101,35 +101,87 @@ export default function RaceSenseDashboard(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<string>('analytics');
   const [showDocs, setShowDocs] = useState<boolean>(false);
 
-  // Process CSV data
+  // Process CSV data with flexible column mapping
   const processData = useCallback((csvData: string) => {
     try {
-      const lines: string[] = csvData.trim().split('\n');
-      const headers: string[] = lines[0].split(',');
+      const lines: string[] = csvData.trim().split('\n').filter(line => line.trim().length > 0);
+      if (lines.length < 2) {
+        console.error('CSV file is empty or has no data rows');
+        return;
+      }
+
+      const headers: string[] = lines[0].split(',').map(h => h.trim().toLowerCase());
       
-      const rawPoints: RawTelemetryPoint[] = lines.slice(1).map((line: string) => {
-        const values: string[] = line.split(',');
-        return {
-          meta_time: parseFloat(values[0]) || 0,
-          ecu_time: parseFloat(values[1]) || 0,
-          lap: parseInt(values[2]) || 0,
-          car_number: parseInt(values[3]) || 0,
-          chassis_number: values[4] ? parseInt(values[4]) : undefined,
-          speed: parseFloat(values[5]) || 0,
-          gear: parseInt(values[6]) || 0,
-          nmot: parseFloat(values[7]) || 0,
-          ath: parseFloat(values[8]) || 0,
-          aps: parseFloat(values[9]) || 0,
-          pbrake_f: parseFloat(values[10]) || 0,
-          pbrake_r: parseFloat(values[11]) || 0,
-          accx_can: parseFloat(values[12]) || 0,
-          accy_can: parseFloat(values[13]) || 0,
-          steering_angle: parseFloat(values[14]) || 0,
-          vbox_long_minutes: parseFloat(values[15]) || 0,
-          vbox_lat_min: parseFloat(values[16]) || 0,
-          laptrigger_lapdist_dls: parseFloat(values[17]) || 0,
+      // Create flexible column mapping - supports various naming conventions
+      const getColumnIndex = (possibleNames: string[]): number => {
+        for (const name of possibleNames) {
+          const index = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
+          if (index !== -1) return index;
+        }
+        return -1;
+      };
+
+      const columnMap = {
+        meta_time: getColumnIndex(['meta_time', 'metatime', 'timestamp', 'time']),
+        ecu_time: getColumnIndex(['ecu_time', 'ecutime', 'ecu']),
+        lap: getColumnIndex(['lap', 'lapnumber', 'lap_number']),
+        car_number: getColumnIndex(['car_number', 'carnumber', 'car', 'number']),
+        chassis_number: getColumnIndex(['chassis_number', 'chassisnumber', 'chassis']),
+        speed: getColumnIndex(['speed', 'velocity']),
+        gear: getColumnIndex(['gear']),
+        nmot: getColumnIndex(['nmot', 'rpm', 'engine_rpm', 'enginerpm']),
+        ath: getColumnIndex(['ath', 'throttle', 'throttle_position']),
+        aps: getColumnIndex(['aps', 'throttle', 'accelerator']),
+        pbrake_f: getColumnIndex(['pbrake_f', 'pbrakef', 'brake_front', 'brakefront']),
+        pbrake_r: getColumnIndex(['pbrake_r', 'pbraker', 'brake_rear', 'brakerear']),
+        accx_can: getColumnIndex(['accx_can', 'accx', 'accel_x', 'acceleration_x']),
+        accy_can: getColumnIndex(['accy_can', 'accy', 'accel_y', 'acceleration_y']),
+        steering_angle: getColumnIndex(['steering_angle', 'steeringangle', 'steering']),
+        vbox_long_minutes: getColumnIndex(['vbox_long_minutes', 'longitude', 'long', 'lon']),
+        vbox_lat_min: getColumnIndex(['vbox_lat_min', 'latitude', 'lat']),
+        laptrigger_lapdist_dls: getColumnIndex(['laptrigger_lapdist_dls', 'lapdist', 'distance', 'lap_distance']),
+      };
+
+      // Helper to safely get value from row
+      const getValue = (values: string[], key: keyof typeof columnMap): string => {
+        const index = columnMap[key];
+        return index !== -1 && index < values.length ? values[index] : '';
+      };
+      
+      const rawPoints: RawTelemetryPoint[] = lines.slice(1).map((line: string, lineIndex: number) => {
+        const values: string[] = line.split(',').map(v => v.trim());
+        
+        // Parse with fallbacks
+        const point: RawTelemetryPoint = {
+          meta_time: parseFloat(getValue(values, 'meta_time')) || parseFloat(getValue(values, 'ecu_time')) || lineIndex * 100,
+          ecu_time: parseFloat(getValue(values, 'ecu_time')) || parseFloat(getValue(values, 'meta_time')) || lineIndex * 100,
+          lap: parseInt(getValue(values, 'lap')) || 1,
+          car_number: parseInt(getValue(values, 'car_number')) || 0,
+          chassis_number: getValue(values, 'chassis_number') ? parseInt(getValue(values, 'chassis_number')) : undefined,
+          speed: parseFloat(getValue(values, 'speed')) || 0,
+          gear: parseInt(getValue(values, 'gear')) || 0,
+          nmot: parseFloat(getValue(values, 'nmot')) || 0,
+          ath: parseFloat(getValue(values, 'ath')) || 0,
+          aps: parseFloat(getValue(values, 'aps')) || 0,
+          pbrake_f: parseFloat(getValue(values, 'pbrake_f')) || 0,
+          pbrake_r: parseFloat(getValue(values, 'pbrake_r')) || 0,
+          accx_can: parseFloat(getValue(values, 'accx_can')) || 0,
+          accy_can: parseFloat(getValue(values, 'accy_can')) || 0,
+          steering_angle: parseFloat(getValue(values, 'steering_angle')) || 0,
+          vbox_long_minutes: parseFloat(getValue(values, 'vbox_long_minutes')) || 0,
+          vbox_lat_min: parseFloat(getValue(values, 'vbox_lat_min')) || 0,
+          laptrigger_lapdist_dls: parseFloat(getValue(values, 'laptrigger_lapdist_dls')) || 0,
         };
-      });
+        
+        return point;
+      }).filter(point => point.meta_time > 0 || point.ecu_time > 0); // Filter out completely invalid rows
+
+      if (rawPoints.length === 0) {
+        console.error('No valid data points found in CSV');
+        return;
+      }
+
+      console.log(`✅ Loaded ${rawPoints.length} telemetry points from ${lines.length - 1} CSV rows`);
 
       // Process telemetry with health check
       const { laps: cleanedLaps, healthReport: health } = TelemetryProcessor.processWithHealthCheck(rawPoints);
