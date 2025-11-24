@@ -394,5 +394,5 @@ interface ProcessedTelemetry {
 
 ---
 
-**Last Updated**: January 2025  
+**Last Updated**: Nov 2025  
 **Version**: 1.0.0
