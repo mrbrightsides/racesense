@@ -18,8 +18,8 @@
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/mrbrightsides/racesense-cota.git
-cd racesense-cota
+git clone https://github.com/mrbrightsides/racesense.git
+cd racesense
 ```
 
 ### 2. Install Dependencies
@@ -132,25 +132,9 @@ racesense/
 - Toyota Racing color palette
 - Custom animations
 
-### `next.config.mjs`
-
-**Build Configuration**:
-```javascript
-{
-  typescript: {
-    ignoreBuildErrors: true  // For competition submission
-  },
-  images: {
-    remotePatterns: [/* Ohara assets */]
-  }
-}
-```
-
 ---
 
 ## Environment Variables
-
-**Good News**: No environment variables required! 🎉
 
 RaceSense is a **fully self-contained application** with:
 - ✅ No external API dependencies
@@ -191,99 +175,6 @@ Navigate to `http://localhost:3000` and verify:
 - ✅ Charts render
 - ✅ Export functions (PDF/PNG/JSON)
 - ✅ Telemetry Health tab displays
-
----
-
-## Deployment Options
-
-### Option 1: Vercel (Recommended)
-
-#### A. Via Vercel Dashboard
-
-1. **Push to GitHub**:
-   ```bash
-   git add .
-   git commit -m "Initial commit"
-   git push origin main
-   ```
-
-2. **Import to Vercel**:
-   - Go to [vercel.com/new](https://vercel.com/new)
-   - Click "Import Project"
-   - Select your GitHub repository
-   - Click "Deploy"
-
-3. **Done!** 🎉
-   - URL: `https://racesense-cota.vercel.app`
-   - Auto-deploys on every push to `main`
-
-#### B. Via Vercel CLI
-
-```bash
-# Install Vercel CLI (if not installed)
-npm i -g vercel
-
-# Login to Vercel
-vercel login
-
-# Deploy
-vercel
-
-# Deploy to production
-vercel --prod
-```
-
-**Output**:
-```
-🔍  Inspect: https://vercel.com/...
-✅  Production: https://racesense-cota.vercel.app
-```
-
----
-
-### Option 2: Netlify
-
-```bash
-# Install Netlify CLI
-npm i -g netlify-cli
-
-# Login
-netlify login
-
-# Deploy
-netlify deploy --prod
-```
-
-**Build Settings**:
-- Build command: `npm run build`
-- Publish directory: `.next`
-
----
-
-### Option 3: Self-Hosted (Docker)
-
-**Dockerfile**:
-```dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --production
-
-COPY . .
-RUN npm run build
-
-EXPOSE 3000
-
-CMD ["npm", "start"]
-```
-
-**Build & Run**:
-```bash
-docker build -t racesense .
-docker run -p 3000:3000 racesense
-```
 
 ---
 
@@ -420,7 +311,7 @@ npm install next@latest
 ### Competition Submission
 - **Event**: Hack the Track 2025
 - **Category**: Real-Time Analytics
-- **Repository**: [github.com/mrbrightsides/racesense-cota](https://github.com/mrbrightsides/racesense-cota)
+- **Repository**: [github.com/mrbrightsides/racesense-cota](https://github.com/mrbrightsides/racesense)
 
 ### Author
 - **Developer**: [mrbrightsides](https://github.com/mrbrightsides)
@@ -437,10 +328,10 @@ npm install next@latest
 
 ```bash
 # 1. Clone
-git clone https://github.com/mrbrightsides/racesense-cota.git
+git clone https://github.com/mrbrightsides/racesense.git
 
 # 2. Install
-cd racesense-cota
+cd racesense
 npm install
 
 # 3. Run
@@ -454,5 +345,5 @@ vercel --prod
 
 ---
 
-**Last Updated**: January 2025  
+**Last Updated**: Nov 2025  
 **Version**: 1.0.0
