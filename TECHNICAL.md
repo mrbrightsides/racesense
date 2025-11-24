@@ -43,7 +43,7 @@ RaceSense is built as a Next.js 14 application using the App Router pattern, wit
 
 ##### A. Timestamp Correction Engine
 
-**Problem**: ECU timestamps (`ecu_time`) can drift due to clock inaccuracies
+**Problem**: ECU timestamps (`ecu_time`) derived timestamps tend to drift over long sessions due to internal clock instability, especially under thermal load.
 
 **Solution**: 
 - Use `meta_time` (logger timestamp) as ground truth
@@ -80,7 +80,7 @@ function correctTimestamps(data: TelemetryPoint[]): TimestampCorrection {
 
 ##### B. Lap Reconstruction Algorithm
 
-**Problem**: Lap numbers can be corrupt (e.g., 32768 = 2^15 overflow)
+**Problem**: Lap counters occasionally overflow (e.g., 32,768 = typical 15-bit rollover), requiring reconstruction using timing and GPS crossing heuristics.
 
 **Solution**: Hybrid reconstruction using:
 1. **Time-based detection** - Identify lap boundaries via timing patterns
