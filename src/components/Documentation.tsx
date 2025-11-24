@@ -427,7 +427,7 @@ export function Documentation(): React.JSX.Element {
                   <ul className="text-sm space-y-1 list-disc list-inside">
                     <li>Client-side processing for instant feedback</li>
                     <li>Efficient array filtering for lap visibility</li>
-                    <li>Memoized calculations to prevent re-renders</li>
+                    <li>Memorized calculations to prevent re-renders</li>
                     <li>Progressive data loading for large datasets</li>
                     <li>Optimized chart rendering with Recharts</li>
                   </ul>
