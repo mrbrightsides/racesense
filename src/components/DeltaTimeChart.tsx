@@ -1,23 +1,21 @@
-'use client'
+'use client';
+
 import type React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import type { TireDegradation } from '@/types/telemetry';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Image } from 'lucide-react';
 import html2canvas from 'html2canvas';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
-import type { CleanedLap } from '@/types/telemetry';
 
-interface DeltaTimeChartProps {
-  laps: CleanedLap[];
-  currentLap: number;
-  bestLapTime: number;
-  averageLapTime: number;
+interface TireDegradationChartProps {
+  tireDegradation: TireDegradation[];
+  currentLap?: number;
 }
 
-export function DeltaTimeChart({ laps, currentLap, bestLapTime, averageLapTime }: DeltaTimeChartProps): React.JSX.Element {
-  
+export const TireDegradationChart: React.FC<TireDegradationChartProps> = ({ tireDegradation, currentLap }) => {
   const exportChart = async (): Promise<void> => {
-    const chartElement = document.getElementById('delta-time-chart');
+    const chartElement = document.getElementById('tire-deg-chart');
     if (!chartElement) return;
 
     try {
@@ -32,7 +30,7 @@ export function DeltaTimeChart({ laps, currentLap, bestLapTime, averageLapTime }
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `delta-time-chart-${Date.now()}.png`;
+          a.download = `tire-degradation-chart-${Date.now()}.png`;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -44,44 +42,32 @@ export function DeltaTimeChart({ laps, currentLap, bestLapTime, averageLapTime }
     }
   };
 
-  // Calculate delta times
-  const chartData = laps
-    .filter((lap: CleanedLap) => !lap.isPitLap && lap.lapTime > 0 && lap.lapTime < 200)
-    .map((lap: CleanedLap) => ({
-      lapNumber: lap.lapNumber,
-      deltaToBest: lap.lapTime - bestLapTime,
-      deltaToAverage: lap.lapTime - averageLapTime,
-      lapTime: lap.lapTime,
-    }));
+  const chartData = tireDegradation.map((deg: TireDegradation) => ({
+    lap: deg.lapNumber,
+    lapTime: parseFloat(deg.lapTime.toFixed(2)),
+    predicted: parseFloat(deg.predictedNextLap.toFixed(2)),
+    degRate: parseFloat((deg.degradationRate * 1000).toFixed(1)), // Convert to ms for readability
+    confidence: parseFloat((deg.confidence * 100).toFixed(0)),
+  }));
 
-  // Custom tooltip
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ value: number; dataKey: string; color: string }> }): React.JSX.Element | null => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload as { lapNumber: number; deltaToBest: number; deltaToAverage: number; lapTime: number };
-      return (
-        <div className="bg-background border border-border p-3 rounded-lg shadow-lg">
-          <p className="font-semibold">Lap {data.lapNumber}</p>
-          <p className="text-sm">Lap Time: {data.lapTime.toFixed(2)}s</p>
-          <p className="text-sm text-green-600">
-            Δ to Best: {data.deltaToBest >= 0 ? '+' : ''}{data.deltaToBest.toFixed(2)}s
-          </p>
-          <p className="text-sm text-blue-600">
-            Δ to Avg: {data.deltaToAverage >= 0 ? '+' : ''}{data.deltaToAverage.toFixed(2)}s
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
+  // Debug: log if no data
+  if (chartData.length === 0 && tireDegradation.length > 0) {
+    console.warn(`⚠️ TireDegradationChart: ${tireDegradation.length} points provided but mapping failed`);
+  }
+
+  const avgDegRate: number = chartData.length > 0
+    ? chartData.reduce((sum: number, d: { lap: number; lapTime: number; predicted: number; degRate: number; confidence: number }) => sum + d.degRate, 0) / chartData.length
+    : 0;
 
   return (
-    <Card id="delta-time-chart">
+    <Card className="w-full" id="tire-deg-chart">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>
-            <CardTitle>Delta Time Analysis</CardTitle>
+            <CardTitle>Tire Degradation Model</CardTitle>
             <CardDescription>
-              Lap time difference vs. best lap and field average
+              Real-time tire performance prediction
+              {avgDegRate > 0 && ` • Avg deg rate: ${avgDegRate.toFixed(0)}ms/lap`}
             </CardDescription>
           </div>
           <Button onClick={exportChart} variant="outline" size="sm" className="gap-2">
@@ -92,47 +78,66 @@ export function DeltaTimeChart({ laps, currentLap, bestLapTime, averageLapTime }
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData}>
+          <AreaChart data={chartData}>
+            <defs>
+              <linearGradient id="colorLapTime" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.1}/>
+              </linearGradient>
+              <linearGradient id="colorPredicted" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0.1}/>
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis 
-              dataKey="lapNumber" 
+              dataKey="lap" 
               label={{ value: 'Lap Number', position: 'insideBottom', offset: -5 }}
+              className="text-xs"
             />
             <YAxis 
-              label={{ value: 'Delta Time (s)', angle: -90, position: 'insideLeft' }}
+              label={{ value: 'Lap Time (s)', angle: -90, position: 'insideLeft' }}
+              domain={['dataMin - 1', 'dataMax + 1']}
+              className="text-xs"
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip 
+              contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+              formatter={(value: number, name: string) => {
+                if (name === 'degRate') return [`${value}ms/lap`, 'Deg Rate'];
+                if (name === 'confidence') return [`${value}%`, 'Confidence'];
+                return [`${value}s`, name];
+              }}
+            />
             <Legend />
-            <ReferenceLine y={0} stroke="#888" strokeDasharray="3 3" />
-            <Line 
+            <Area 
               type="monotone" 
-              dataKey="deltaToBest" 
-              stroke="#22c55e" 
+              dataKey="lapTime" 
+              stroke="hsl(var(--chart-1))" 
+              fill="url(#colorLapTime)"
               strokeWidth={2}
-              name="Δ to Best Lap"
-              dot={{ r: 3 }}
+              name="Actual Lap Time"
+            />
+            <Area 
+              type="monotone" 
+              dataKey="predicted" 
+              stroke="hsl(var(--chart-3))" 
+              fill="url(#colorPredicted)"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              name="Predicted Next Lap"
             />
             <Line 
               type="monotone" 
-              dataKey="deltaToAverage" 
-              stroke="#3b82f6" 
+              dataKey="degRate" 
+              stroke="hsl(var(--destructive))" 
               strokeWidth={2}
-              name="Δ to Average"
               dot={{ r: 3 }}
+              yAxisId="right"
+              name="Deg Rate (ms/lap)"
             />
-          </LineChart>
+          </AreaChart>
         </ResponsiveContainer>
-        <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
-          <div className="p-3 bg-green-50 dark:bg-green-950 rounded-lg">
-            <p className="font-semibold text-green-700 dark:text-green-300">Best Lap Reference</p>
-            <p className="text-2xl font-bold text-green-600">{bestLapTime.toFixed(2)}s</p>
-          </div>
-          <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
-            <p className="font-semibold text-blue-700 dark:text-blue-300">Field Average</p>
-            <p className="text-2xl font-bold text-blue-600">{averageLapTime.toFixed(2)}s</p>
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
-}
+};
