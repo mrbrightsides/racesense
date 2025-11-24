@@ -50,6 +50,11 @@ export const TireDegradationChart: React.FC<TireDegradationChartProps> = ({ tire
     confidence: parseFloat((deg.confidence * 100).toFixed(0)),
   }));
 
+  // Debug: log if no data
+  if (chartData.length === 0 && tireDegradation.length > 0) {
+    console.warn(`⚠️ TireDegradationChart: ${tireDegradation.length} points provided but mapping failed`);
+  }
+
   const avgDegRate: number = chartData.length > 0
     ? chartData.reduce((sum: number, d: { lap: number; lapTime: number; predicted: number; degRate: number; confidence: number }) => sum + d.degRate, 0) / chartData.length
     : 0;
