@@ -374,11 +374,6 @@ RaceSense validates every row against these rules:
 
 ## References
 
-- **Toyota GR Cup Technical Regulations**: [Link to regulations]
-- **COTA Track Map**: https://circuitoftheamericas.com/track
+- **Toyota GR Cup Technical Regulations**: [[Link to regulations](https://hackthetrack.devpost.com/rules)]
+- **COTA Track Map**: https://circuitoftheamericas.com/
 - **Telemetry Systems**: VBOX Sport, AIM MXS, Motec C125
-
----
-
-**Last Updated**: January 2025  
-**Version**: 1.0.0
