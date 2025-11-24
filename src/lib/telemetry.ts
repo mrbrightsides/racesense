@@ -84,12 +84,14 @@ export class TelemetryProcessor {
    * Reconstruct lap boundaries using GPS + speed patterns
    * Now uses professional-grade lap reconstruction algorithms
    */
-  static reconstructLaps(data: RawTelemetryPoint[]): CleanedLap[] {
+  static reconstructLaps(data: RawTelemetryPoint[], skipReconstruction: boolean = false): CleanedLap[] {
     const laps: Map<number, RawTelemetryPoint[]> = new Map();
 
     // Use hybrid lap reconstruction (time-based + GPS if available)
-    const reconstruction = LapReconstructor.reconstructLapsHybrid(data);
-    const fixedData: RawTelemetryPoint[] = reconstruction.data;
+    // Skip if data is already reconstructed (from processWithHealthCheck)
+    const fixedData: RawTelemetryPoint[] = skipReconstruction 
+      ? data 
+      : LapReconstructor.reconstructLapsHybrid(data).data;
 
     // Group by lap
     fixedData.forEach((point: RawTelemetryPoint) => {
@@ -111,12 +113,49 @@ export class TelemetryProcessor {
       const speeds: number[] = cleanedPoints.map((p: CleanedTelemetryPoint) => p.speed);
       const times: number[] = cleanedPoints.map((p: CleanedTelemetryPoint) => p.time);
 
-      const lapTime: number = (times[times.length - 1] - times[0]) / 1000; // Convert to seconds
+      // Smart lap time calculation - handles various timestamp formats
+      const timeRange: number = times[times.length - 1] - times[0];
+      let lapTime: number = 0;
+      
+      // If time range is very large (>10000), likely milliseconds or Unix timestamp
+      if (timeRange > 10000) {
+        // Try milliseconds first
+        const msToSeconds = timeRange / 1000;
+        if (msToSeconds >= 60 && msToSeconds <= 300) {
+          lapTime = msToSeconds;
+        } else {
+          // Likely Unix timestamp - calculate from speed
+          const avgSpeedKmh = speeds.reduce((a: number, b: number) => a + b, 0) / speeds.length;
+          lapTime = avgSpeedKmh > 0 ? (5.513 / (avgSpeedKmh / 3600)) : 90; // Fallback to ~90s typical lap
+        }
+      } 
+      // If time range is reasonable lap time in seconds (60-300s)
+      else if (timeRange >= 60 && timeRange <= 300) {
+        lapTime = timeRange;
+      }
+      // Otherwise, calculate from average speed
+      else {
+        const avgSpeedKmh = speeds.reduce((a: number, b: number) => a + b, 0) / speeds.length;
+        if (avgSpeedKmh > 10) {
+          lapTime = 5.513 / (avgSpeedKmh / 3600); // COTA lap distance / speed
+        } else {
+          // No valid speed data, use lap point count as approximation (100 Hz = 100 points per second)
+          lapTime = points.length / 100;
+        }
+      }
+      
+      // Ensure lap time is in valid range
+      if (lapTime < 60 || lapTime > 300) {
+        // Last resort: use point count (assuming 100 Hz sampling)
+        lapTime = points.length / 100;
+      }
+      
       const avgSpeed: number = speeds.reduce((a: number, b: number) => a + b, 0) / speeds.length;
       const maxSpeed: number = Math.max(...speeds);
 
-      // Detect pit lap (significant speed drop + low avg speed)
-      const isPitLap: boolean = avgSpeed < 60 || lapTime > 180;
+      // Detect pit lap (only mark as pit if VERY slow)
+      // Ultra-relaxed: only mark as pit if avgSpeed is extremely low AND lapTime is extremely high
+      const isPitLap: boolean = avgSpeed < 25 && lapTime > 300;
 
       processedLaps.push({
         lapNumber,
@@ -128,6 +167,11 @@ export class TelemetryProcessor {
         telemetryPoints: cleanedPoints,
         isPitLap,
       });
+
+      // Debug only first lap
+      if (lapNumber === 1) {
+        console.log(`📊 First lap: time=${lapTime.toFixed(2)}s, avgSpeed=${avgSpeed.toFixed(1)}km/h, isPit=${isPitLap}`);
+      }
     });
 
     return processedLaps.sort((a: CleanedLap, b: CleanedLap) => a.lapNumber - b.lapNumber);
@@ -137,9 +181,9 @@ export class TelemetryProcessor {
    * Calculate tire degradation across laps
    */
   static calculateTireDegradation(laps: CleanedLap[]): TireDegradation[] {
-    // Filter out pit laps and invalid laps
+    // Filter out pit laps and invalid laps (relaxed to match chart filters)
     const racingLaps: CleanedLap[] = laps.filter((lap: CleanedLap) => 
-      !lap.isPitLap && lap.lapTime > 0 && lap.lapTime < 200
+      !lap.isPitLap && lap.lapTime > 0 && lap.lapTime < 400
     );
 
     if (racingLaps.length < 3) return [];
@@ -217,8 +261,8 @@ export class TelemetryProcessor {
     const reconstruction = LapReconstructor.reconstructLapsHybrid(correctedData);
     const processedData = reconstruction.data;
 
-    // Process laps normally
-    const cleanedLaps = this.reconstructLaps(data); // Use original data for comparison
+    // Process laps with corrected data (skip reconstruction since we already did it)
+    const cleanedLaps = this.reconstructLaps(processedData, true);
 
     // Generate comprehensive health report
     const healthReport = TelemetryHealthAnalyzer.generateHealthReport(data, processedData);
