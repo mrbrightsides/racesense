@@ -10,7 +10,7 @@
 
 ## 🏁 Overview
 
-**RaceSense** is a professional-grade real-time racing analytics tool designed for the **Toyota GR Cup Series** at Circuit of the Americas (COTA). Built for the **Hack the Track 2025** competition, it provides race engineers with AI-powered strategic insights during live racing sessions.
+**RaceSense** is a professional-grade real-time racing analytics tool designed for the **Toyota GR Cup Series** at Circuit of the Americas (COTA). Developed for the **Hack the Track 2025** competition, it provides race engineers with AI-powered strategic insights during live racing sessions.
 
 ### 🎯 Competition Category
 **Real-Time Analytics** - Delivering actionable insights that influence race-day decisions.
@@ -99,8 +99,8 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/mrbrightsides/racesense-cota.git
-cd racesense-cota
+git clone https://github.com/mrbrightsides/racesense.git
+cd racesense
 
 # Install dependencies
 npm install
@@ -195,4 +195,4 @@ MIT License - See LICENSE file for details
 
 ---
 
-**Ready to revolutionize race strategy at COTA.** 🏁🚀
+**Built to redefine real-time race strategy at COTA.** 🏁🚀
